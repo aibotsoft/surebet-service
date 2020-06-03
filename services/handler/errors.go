@@ -1,14 +1,19 @@
 package handler
 
+var SbError = SurebetError{}
+
 type SurebetError struct {
-	cause     error
-	msg       string
-	permanent bool
+	Err         error
+	Msg         string
+	Permanent   bool
+	ServiceName string
 }
 
-func (s SurebetError) Error() string {
-	if s.cause != nil {
-		return s.msg + ": " + s.cause.Error()
+func (e SurebetError) Error() string {
+	if e.Err != nil {
+		return e.Msg + ": " + e.Err.Error()
 	}
-	return s.msg
+	return e.Msg
 }
+
+func (e SurebetError) Unwrap() error { return e.Err }

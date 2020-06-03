@@ -6,6 +6,7 @@ import (
 	pb "github.com/aibotsoft/gen/fortedpb"
 	"github.com/aibotsoft/micro/cache"
 	"github.com/aibotsoft/micro/config"
+	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/dgraph-io/ristretto"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -16,18 +17,18 @@ type Store struct {
 	cfg   *config.Config
 	log   *zap.SugaredLogger
 	db    *sqlx.DB
-	cache *ristretto.Cache
+	Cache *ristretto.Cache
 }
 
 func NewStore(cfg *config.Config, log *zap.SugaredLogger, db *sqlx.DB) *Store {
-	return &Store{log: log, db: db, cache: cache.NewCache(cfg)}
+	return &Store{log: log, db: db, Cache: cache.NewCache(cfg)}
 }
 func (s *Store) Close() {
 	err := s.db.Close()
 	if err != nil {
 		s.log.Error(err)
 	}
-	s.cache.Close()
+	s.Cache.Close()
 }
 
 func MemberByName(sb *pb.Surebet, serviceName string) *pb.SurebetSide {
@@ -108,7 +109,7 @@ func (s *Store) SaveCalc(sb *pb.Surebet) error {
 func (s *Store) SaveSide(sb *pb.Surebet) error {
 	for i, side := range sb.Members {
 		side.GetCheck()
-		_, err := s.db.Exec("uspSaveSide",
+		_, err := s.db.Exec("dbo.uspSaveSide",
 			sql.Named("SurebetId", sb.SurebetId),
 			sql.Named("SideIndex", i),
 			sql.Named("ServiceName", side.ServiceName),
@@ -161,4 +162,18 @@ func (s *Store) SaveSide(sb *pb.Surebet) error {
 		}
 	}
 	return nil
+}
+
+func (s *Store) SaveBetList(results []pb.BetResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+	tvp := mssql.TVP{TypeName: "BetListType", Value: results}
+
+	_, err := s.db.Exec("dbo.uspSaveBetList", tvp)
+	if err != nil {
+		return errors.Wrap(err, "uspSaveResults error")
+	}
+	return nil
+
 }

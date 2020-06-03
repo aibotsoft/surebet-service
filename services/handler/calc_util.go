@@ -36,13 +36,17 @@ func FirstSecond(sb *pb.Surebet) {
 	sb.Calc.SecondName = sb.Members[sb.Calc.SecondIndex].ServiceName
 	sb.Members[sb.Calc.FirstIndex].CheckCalc.IsFirst = true
 }
-func CalcMaxStake(m *pb.SurebetSide) {
+func CalcMaxStake(m *pb.SurebetSide) *SurebetError {
+	if m.Check.Price == 0 {
+		return &SurebetError{Msg: "Check.Price is 0", ServiceName: m.ServiceName}
+	}
 	//m.CheckCalc.MaxStake = Min(float64(m.Check.Balance), m.Check.MaxBet, float64(m.BetConfig.MaxStake), float64(m.BetConfig.MaxWin)/m.Check.Price)
 	m.CheckCalc.MaxStake, _ = decimal.Min(
 		decimal.New(m.Check.Balance, 0),
 		decimal.NewFromFloat(m.Check.MaxBet),
 		decimal.New(m.BetConfig.MaxStake, 0),
 		decimal.New(m.BetConfig.MaxWin, 0).DivRound(decimal.NewFromFloat(m.Check.Price), 3)).Float64()
+	return nil
 }
 func CalcMinStake(m *pb.SurebetSide) {
 	m.CheckCalc.MinStake = Max(m.Check.MinBet, float64(m.BetConfig.MinStake))

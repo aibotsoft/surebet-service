@@ -4,24 +4,30 @@ import (
 	"context"
 	pb "github.com/aibotsoft/gen/fortedpb"
 	"github.com/aibotsoft/micro/config"
+	"github.com/aibotsoft/micro/config_client"
 	"github.com/aibotsoft/micro/logger"
 	"github.com/aibotsoft/micro/sqlserver"
+	"github.com/aibotsoft/micro/util"
 	"github.com/aibotsoft/surebet-service/pkg/clients"
 	"github.com/aibotsoft/surebet-service/pkg/store"
 	"github.com/aibotsoft/surebet-service/pkg/tests"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
-func InitHelper(t *testing.T) *Handler {
-	t.Helper()
+var h *Handler
+
+func TestMain(m *testing.M) {
 	cfg := config.New()
 	log := logger.New()
 	db := sqlserver.MustConnectX(cfg)
 	sto := store.NewStore(cfg, log, db)
-	cli := clients.NewClients(log)
-	h := NewHandler(cfg, log, sto, cli)
-	return h
+	cli := clients.NewClients(nil, log, nil)
+	conf := config_client.New(cfg, log)
+	h = NewHandler(cfg, log, sto, cli, conf)
+	m.Run()
+	h.Close()
 }
 
 func SurebetToProcess(t *testing.T) *pb.Surebet {
@@ -58,13 +64,11 @@ func SurebetToProcess(t *testing.T) *pb.Surebet {
 }
 
 func TestHandler_SurebetLoop(t *testing.T) {
-	h := InitHelper(t)
 	sur := SurebetToProcess(t)
 	h.SurebetLoop(sur)
 }
 
 func TestHandler_CheckLine(t *testing.T) {
-	h := InitHelper(t)
 	sur := tests.SurebetHelper(t)
 	h.CheckLine(context.Background(), sur, 0, nil)
 }
@@ -73,4 +77,19 @@ func TestSurebetWithOneMember(t *testing.T) {
 	sur := SurebetToProcess(t)
 	got := SurebetWithOneMember(sur, 1)
 	t.Log(got)
+}
+
+func TestTimeFromSurebetId(t *testing.T) {
+	sbId := util.UnixUsNow()
+	time.Sleep(time.Millisecond * 10)
+	got := ElapsedFromSurebetId(sbId)
+	t.Log(got)
+}
+
+func TestHandler_GetCurrency(t *testing.T) {
+	got, err := h.GetCurrency(context.Background())
+	if assert.NoError(t, err) {
+		assert.NotEmpty(t, got)
+		t.Log(got)
+	}
 }

@@ -19,4 +19,5 @@ create table dbo.BetConfig
 insert into dbo.BetConfig (ServiceName, Regime, MinStake, MaxStake, MinPercent, MaxPercent, Priority, MaxCountLine,
                            MaxCountEvent, MaxAmountEvent,MaxAmountLine, RoundValue)
 values ('Pinnacle', 'Surebet', default, default, default, default, default, default, default, default,default, 0.01),
-       ('Sbobet', 'Surebet', default, default, default, default, default, default, default, default,default, default)
+       ('Sbobet', 'Surebet', default, default, default, default, default, default, default, default,default, default),
+       ('Dafabet', 'Surebet', default, default, default, default, default, default, default, default,default, default)

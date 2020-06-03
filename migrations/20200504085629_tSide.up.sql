@@ -12,7 +12,7 @@ create table dbo.Side
     Price         decimal(9, 5),
     Initiator     bit,
     Starts        datetimeoffset,
-    EventId       int,
+    EventId       varchar(1000),
 
     CheckId       bigint,
     AccountId     tinyint,
@@ -23,7 +23,7 @@ create table dbo.Side
     CountEvent    int,
     AmountEvent   int,
     MinBet        decimal(9, 5),
-    MaxBet        decimal(9, 5),
+    MaxBet        decimal(9, 3),
     Balance       int,
     CheckPrice    decimal(9, 5),
     Currency      decimal(9, 5),

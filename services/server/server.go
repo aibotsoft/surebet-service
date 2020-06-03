@@ -19,31 +19,32 @@ type Server struct {
 	pb.UnimplementedFortedServer
 }
 
+func NewServer(cfg *config.Config, log *zap.SugaredLogger, handler *handler.Handler) *Server {
+	return &Server{cfg: cfg, log: log, handler: handler, gs: grpc.NewServer()}
+}
+func (s *Server) Close() {
+	s.log.Debug("begin gRPC server gracefulStop")
+	s.gs.GracefulStop()
+	s.handler.Close()
+	s.log.Debug("end gRPC server gracefulStop")
+}
 func (s *Server) PlaceSurebet(ctx context.Context, req *pb.PlaceSurebetRequest) (*pb.PlaceSurebetResponse, error) {
 	go s.handler.SurebetLoop(req.GetSurebet())
 	return &pb.PlaceSurebetResponse{}, nil
 }
-
-func NewServer(cfg *config.Config, log *zap.SugaredLogger, handler *handler.Handler) *Server {
-	return &Server{
-		cfg:     cfg,
-		log:     log,
-		handler: handler,
-		gs:      grpc.NewServer(),
-	}
+func (s *Server) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
+	return &pb.PingResponse{}, nil
 }
 func (s *Server) Serve() error {
-	addr := net.JoinHostPort("", s.cfg.SurebetService.GrpcPort)
+	addr, err := s.handler.Conf.GetGrpcAddr(context.Background(), s.cfg.Service.Name)
+	if err != nil {
+		return err
+	}
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return errors.Wrap(err, "net.Listen error")
 	}
 	pb.RegisterFortedServer(s.gs, s)
-	s.log.Infow("gRPC server listens", "addr", addr, "name", s.cfg.Service.Name)
+	s.log.Infow("gRPC server listens", "name", s.cfg.Service.Name, "addr", addr)
 	return s.gs.Serve(lis)
-}
-func (s *Server) Close() {
-	s.log.Debug("begin gRPC server gracefulStop")
-	s.gs.GracefulStop()
-	s.log.Debug("end gRPC server gracefulStop")
 }

@@ -3,47 +3,40 @@ package clients
 import (
 	"context"
 	pb "github.com/aibotsoft/gen/fortedpb"
+	"github.com/aibotsoft/micro/config"
+	"github.com/aibotsoft/micro/config_client"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
-	"time"
+	"strconv"
 )
-
-//type Clients struct {
-//	log  *zap.SugaredLogger
-//	conn *grpc.ClientConn
-//	pb.SurebetClient
-//}
 
 type Clients map[string]pb.FortedClient
 
-var clientList = map[string]string{"Pinnacle": "50054", "Sbobet": "50053"}
-
-//var clientList = map[string]string{ "Sbobet": "50053"}
-
-func NewClients(log *zap.SugaredLogger) Clients {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func NewClients(cfg *config.Config, log *zap.SugaredLogger, conf *config_client.ConfClient) Clients {
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.GrpcTimeout)
 	defer cancel()
+	services, err := conf.GetServices(ctx)
+	if err != nil {
+		log.Panic(err)
+	}
 	clients := make(Clients)
-	for name, addr := range clientList {
-		conn, err := grpc.DialContext(ctx, net.JoinHostPort("", addr), grpc.WithInsecure(), grpc.WithBlock())
+	for _, s := range services {
+		addr := net.JoinHostPort("", strconv.FormatInt(s.GrpcPort, 10))
+		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock())
 		if err != nil {
-			log.Panicw("dial to client error", "name", name, "addr", addr)
+			log.Errorw("dial to client error", "name", s.ServiceName, "addr", addr)
+			continue
 		}
-		clients[name] = pb.NewFortedClient(conn)
-		log.Infow("begin ping to server", "name", name, "addr", addr)
-		_, err = clients[name].Ping(ctx, &pb.PingRequest{})
+		c := pb.NewFortedClient(conn)
+		log.Infow("begin ping to server", "name", s.ServiceName, "addr", addr)
+		_, err = c.Ping(ctx, &pb.PingRequest{})
 		if err != nil {
-			log.Panicw("server do not response to ping", "name", name, "addr", addr)
+			log.Errorw("server do not response to ping", "name", s.ServiceName, "addr", addr)
+			continue
 		}
-		log.Infow("server responded", "name", name, "addr", addr)
+		log.Infow("server responded", "name", s.ServiceName, "addr", addr)
+		clients[s.FortedName] = c
 	}
 	return clients
 }
-
-//func (p *Clients) Close() {
-//	err := p.conn.Close()
-//	if err != nil {
-//		p.log.Error(err)
-//	}
-//}
