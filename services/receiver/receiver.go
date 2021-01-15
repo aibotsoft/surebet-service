@@ -16,7 +16,9 @@ type Receiver struct {
 }
 
 func New(cfg *config.Config, log *zap.SugaredLogger, handler *handler.Handler) *Receiver {
-	nc, err := nats.Connect("nats://192.168.1.10:30873")
+	log.Infow("begin_connect_nats", "url", cfg.Broker.Url)
+
+	nc, err := nats.Connect(cfg.Broker.Url)
 	if err != nil {
 		log.Panic(err)
 	}
