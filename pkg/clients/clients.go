@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
+	"os"
 	"strconv"
 )
 
@@ -29,10 +30,16 @@ func NewClients(cfg *config.Config, log *zap.SugaredLogger, conf *config_client.
 	if err != nil {
 		log.Panic(err)
 	}
+	log.Infow("service_list", "", services)
 	clients := make(Clients)
 	for _, s := range services {
-		addr := net.JoinHostPort("", strconv.FormatInt(s.GrpcPort, 10))
-		log.Info("begin_dial_service: ", s.GrpcPort, " err: ", err, " addr: ", addr)
+		addr := ""
+		if os.Getenv("is_debug") != "" {
+			addr = net.JoinHostPort("", strconv.FormatInt(s.GrpcPort, 10))
+		} else {
+			addr = net.JoinHostPort(s.ServiceName, strconv.FormatInt(50051, 10))
+		}
+		log.Info("begin_dial_service: ", addr, " err: ", err)
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.GrpcTimeout)
 		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock())
 		cancel()
