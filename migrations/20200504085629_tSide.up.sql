@@ -1,7 +1,7 @@
 create table dbo.Side
 (
-    SurebetId     bigint                                     not null,
-    SideIndex     tinyint                                        not null,
+    SurebetId     bigint                                        not null,
+    SideIndex     tinyint                                       not null,
 
     ServiceName   varchar(1000),
     SportName     varchar(1000),
@@ -47,8 +47,9 @@ create table dbo.Side
     BetPrice      decimal(9, 5),
     BetStake      decimal(9, 5),
     ApiBetId      varchar(1000),
+    SubService      varchar(1000),
 
-    UpdatedAt     datetimeoffset default sysdatetimeoffset() not null,
-    CreatedAt     datetimeoffset default sysdatetimeoffset() not null,
+    UpdatedAt     datetimeoffset(2) default sysdatetimeoffset() not null,
+    CreatedAt     datetimeoffset(2) default sysdatetimeoffset() not null,
     constraint PK_Side primary key (SurebetId, SideIndex),
 )

@@ -8,6 +8,6 @@ create table dbo.FortedSurebet
     FortedSport     varchar(1000),
     FortedLeague    varchar(1000),
     FilterName      varchar(1000),
-    FortedSurebetId int not null,
+    FortedSurebetId bigint not null,
     constraint PK_FortedSurebet primary key (FortedSurebetId),
 )

@@ -6,11 +6,13 @@ import (
 	pb "github.com/aibotsoft/gen/fortedpb"
 	"github.com/aibotsoft/micro/cache"
 	"github.com/aibotsoft/micro/config"
+	"github.com/aibotsoft/micro/util"
 	mssql "github.com/denisenkom/go-mssqldb"
 	"github.com/dgraph-io/ristretto"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"time"
 )
 
 type Store struct {
@@ -31,46 +33,67 @@ func (s *Store) Close() {
 	s.Cache.Close()
 }
 
-func MemberByName(sb *pb.Surebet, serviceName string) *pb.SurebetSide {
-	for i := 0; i < len(sb.Members); i++ {
-		if sb.Members[i].ServiceName == serviceName {
-			return sb.Members[i]
-		}
-	}
-	return nil
-}
-func MemberNameList(sb *pb.Surebet) []string {
-	var nameList []string
-	for i := 0; i < len(sb.Members); i++ {
-		nameList = append(nameList, sb.Members[i].ServiceName)
-	}
-	return nameList
-}
+//func MemberByName(sb *pb.Surebet, serviceName string) *pb.SurebetSide {
+//	for i := 0; i < len(sb.Members); i++ {
+//		if sb.Members[i].ServiceName == serviceName {
+//			return sb.Members[i]
+//		}
+//	}
+//	return nil
+//}
+//func MemberNameList(sb *pb.Surebet) []string {
+//	var nameList []string
+//	for i := 0; i < len(sb.Members); i++ {
+//		nameList = append(nameList, sb.Members[i].ServiceName)
+//	}
+//	return nameList
+//}
+//
+//func Filter(arr []pb.BetConfig, name string) *pb.BetConfig {
+//	for i := range arr {
+//		if arr[i].ServiceName == name {
+//			return &arr[i]
+//		}
+//	}
+//	return nil
+//}
 
-func Filter(arr []pb.BetConfig, name string) *pb.BetConfig {
-	for i := range arr {
-		if arr[i].ServiceName == name {
-			return &arr[i]
-		}
+//func (s *Store) LoadConfig(ctx context.Context, sb *pb.Surebet) error {
+//	var betConfigs []pb.BetConfig
+//	query, args, err := sqlx.In("SELECT * FROM dbo.BetConfig WHERE ServiceName IN (?)", MemberNameList(sb))
+//	err = s.db.SelectContext(ctx, &betConfigs, s.db.Rebind(query), args...)
+//	if err != nil {
+//		return errors.Wrapf(err, "select BetConfig error")
+//	}
+//	for i := range sb.Members {
+//		sb.Members[i].BetConfig = Filter(betConfigs, sb.Members[i].ServiceName)
+//	}
+//	return nil
+//}
+func (s *Store) GetConfigByName(ctx context.Context, name string) (conf pb.BetConfig, err error) {
+	got, b := s.Cache.Get("config:" + name)
+	if b {
+		return got.(pb.BetConfig), nil
 	}
-	return nil
-}
-
-func (s *Store) LoadConfig(ctx context.Context, sb *pb.Surebet) error {
-	var betConfigs []pb.BetConfig
-	query, args, err := sqlx.In("SELECT * FROM dbo.BetConfig WHERE ServiceName IN (?)", MemberNameList(sb))
-	err = s.db.SelectContext(ctx, &betConfigs, s.db.Rebind(query), args...)
+	err = s.db.GetContext(ctx, &conf, "SELECT * FROM dbo.BetConfig WHERE ServiceName = @p1", name)
 	if err != nil {
-		return errors.Wrapf(err, "select BetConfig error")
+		return
 	}
-	for i := range sb.Members {
-		sb.Members[i].BetConfig = Filter(betConfigs, sb.Members[i].ServiceName)
+	s.Cache.SetWithTTL("config:"+name, conf, 1, time.Minute)
+	return
+}
+func (s *Store) GetConfigBySub(ctx context.Context, name string) (conf pb.BetConfig, err error) {
+	got, b := s.Cache.Get("config:" + name)
+	if b {
+		return got.(pb.BetConfig), nil
 	}
-	return nil
+	err = s.db.GetContext(ctx, &conf, "SELECT * FROM dbo.BetConfig WHERE SubName = @p1", name)
+	s.Cache.SetWithTTL("config:"+name, conf, 1, time.Minute)
+	return
 }
 
 func (s *Store) SaveFortedSurebet(sb *pb.Surebet) error {
-	_, err := s.db.Exec("uspSaveFortedSurebet",
+	_, err := s.db.Exec("dbo.uspSaveFortedSurebet",
 		sql.Named("CreatedAt", sb.CreatedAt),
 		sql.Named("Starts", sb.Starts),
 		sql.Named("FortedHome", sb.FortedHome),
@@ -87,7 +110,7 @@ func (s *Store) SaveFortedSurebet(sb *pb.Surebet) error {
 }
 
 func (s *Store) SaveCalc(sb *pb.Surebet) error {
-	_, err := s.db.Exec("uspSaveCalc",
+	_, err := s.db.Exec("dbo.uspSaveCalc",
 		sql.Named("Profit", sb.Calc.Profit),
 		sql.Named("FirstName", sb.Calc.FirstName),
 		sql.Named("SecondName", sb.Calc.SecondName),
@@ -99,6 +122,7 @@ func (s *Store) SaveCalc(sb *pb.Surebet) error {
 		sql.Named("WinDiffRel", sb.Calc.WinDiffRel),
 		sql.Named("FortedSurebetId", sb.FortedSurebetId),
 		sql.Named("SurebetId", sb.SurebetId),
+		sql.Named("Roi", sb.Calc.Roi),
 	)
 	if err != nil {
 		return errors.Wrap(err, "uspSaveCalc error")
@@ -108,7 +132,6 @@ func (s *Store) SaveCalc(sb *pb.Surebet) error {
 
 func (s *Store) SaveSide(sb *pb.Surebet) error {
 	for i, side := range sb.Members {
-		side.GetCheck()
 		_, err := s.db.Exec("dbo.uspSaveSide",
 			sql.Named("SurebetId", sb.SurebetId),
 			sql.Named("SideIndex", i),
@@ -137,6 +160,7 @@ func (s *Store) SaveSide(sb *pb.Surebet) error {
 			sql.Named("CheckPrice", side.Check.Price),
 			sql.Named("Currency", side.Check.Currency),
 			sql.Named("CheckDone", side.Check.Done),
+			sql.Named("SubService", side.Check.SubService),
 
 			sql.Named("CalcStatus", side.GetCheckCalc().GetStatus()),
 			sql.Named("MaxStake", side.GetCheckCalc().GetMaxStake()),
@@ -164,16 +188,99 @@ func (s *Store) SaveSide(sb *pb.Surebet) error {
 	return nil
 }
 
+//func (s *Store) SaveBetList(results []pb.BetResult) error {
+//	if len(results) == 0 {
+//		return nil
+//	}
+//	s.log.Info("got_results_from_services:", len(results))
+//	tvp := mssql.TVP{TypeName: "BetListType", Value: results}
+//
+//	_, err := s.db.Exec("dbo.uspSaveBetList", tvp)
+//	if err != nil {
+//		//for i := range results {
+//		//	s.log.Infow("", "", results[i])
+//		//}
+//		return errors.Wrap(err, "uspSaveResults error")
+//	}
+//	return nil
+//}
+
+//func (s *Store) SaveBetList(results []pb.BetResult) error {
+//	if len(results) == 0 {
+//		return nil
+//	}
+//	var ids []int64
+//	err := s.db.Select(&ids, "select top 1000 SurebetId from Calc order by SurebetId desc")
+//	if err != nil {
+//		s.log.Error(err)
+//		return err
+//	}
+//	//s.log.Info(ids)
+//	var filteredResults []pb.BetResult
+//	for i := range results {
+//		//s.log.Debugw("", "", results[i])
+//		if util.Int64InList(results[i].GetSurebetId(), ids) {
+//			if results[i].GetSideIndex() != 9 {
+//				filteredResults = append(filteredResults, results[i])
+//			} else {
+//				//s.log.Info("got_results_from_services:", results[i])
+//				_, err := s.db.Exec("update BetList set Price=@p1, Stake=@p2, WinLoss=@p3, ApiBetId=@p4, ApiBetStatus=@p5 where SurebetId=@p6 and BetId=@p7",
+//					results[i].Price, results[i].Stake, results[i].WinLoss, results[i].ApiBetId, results[i].ApiBetStatus, results[i].SurebetId, results[i].BetId)
+//				if err != nil {
+//					s.log.Error(err)
+//				}
+//
+//			}
+//		}
+//	}
+//	tvp := mssql.TVP{TypeName: "BetListType", Value: filteredResults}
+//
+//	_, err = s.db.Exec("dbo.uspSaveBetList", tvp)
+//	if err != nil {
+//		return errors.Wrap(err, "uspSaveBetList_error")
+//	}
+//	return nil
+//}
 func (s *Store) SaveBetList(results []pb.BetResult) error {
 	if len(results) == 0 {
 		return nil
 	}
-	tvp := mssql.TVP{TypeName: "BetListType", Value: results}
-
-	_, err := s.db.Exec("dbo.uspSaveBetList", tvp)
+	var ids []int64
+	err := s.db.Select(&ids, "select top 5000 SurebetId from Calc order by SurebetId desc")
 	if err != nil {
-		return errors.Wrap(err, "uspSaveResults error")
+		s.log.Error(err)
+		return err
+	}
+	//s.log.Info(ids)
+	var filteredResults []pb.BetResult
+	for i := range results {
+		//s.log.Debugw("", "", results[i])
+		if util.Int64InList(results[i].GetSurebetId(), ids) {
+			if results[i].GetSideIndex() != 9 {
+				filteredResults = append(filteredResults, results[i])
+			} else {
+				//s.log.Info("got_results_from_services:", results[i])
+				_, err := s.db.Exec("dbo.uspSaveBetListNew",
+					sql.Named("Price", results[i].Price),
+					sql.Named("Stake", results[i].Stake),
+					sql.Named("WinLoss", results[i].WinLoss),
+					sql.Named("ApiBetId", results[i].ApiBetId),
+					sql.Named("ApiBetStatus", results[i].ApiBetStatus),
+					sql.Named("SurebetId", results[i].SurebetId),
+					sql.Named("BetId", results[i].BetId),
+					sql.Named("SideIndex", results[i].SideIndex),
+				)
+				if err != nil {
+					s.log.Error(err)
+				}
+			}
+		}
+	}
+	tvp := mssql.TVP{TypeName: "BetListType", Value: filteredResults}
+
+	_, err = s.db.Exec("dbo.uspSaveBetList", tvp)
+	if err != nil {
+		return errors.Wrap(err, "uspSaveBetList_error")
 	}
 	return nil
-
 }

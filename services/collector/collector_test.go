@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/aibotsoft/micro/config"
+	"github.com/aibotsoft/micro/config_client"
 	"github.com/aibotsoft/micro/logger"
 	"github.com/aibotsoft/micro/sqlserver"
 	"github.com/aibotsoft/surebet-service/pkg/clients"
@@ -16,13 +17,15 @@ func InitHelper(t *testing.T) *Collector {
 	log := logger.New()
 	db := sqlserver.MustConnectX(cfg)
 	sto := store.NewStore(cfg, log, db)
-	cli := clients.NewClients(nil, log, nil)
+	conf := config_client.New(cfg, log)
+
+	cli := clients.NewClients(cfg, log, conf)
 	h := New(cfg, log, sto, cli)
 	return h
 }
 
 func TestCollector_CollectResults(t *testing.T) {
 	c := InitHelper(t)
-	err := c.CollectResults()
+	err := c.CollectResultsRound()
 	assert.NoError(t, err)
 }

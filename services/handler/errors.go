@@ -1,7 +1,5 @@
 package handler
 
-var SbError = SurebetError{}
-
 type SurebetError struct {
 	Err         error
 	Msg         string

@@ -6,11 +6,11 @@ create or alter proc dbo.uspSaveFortedSurebet @CreatedAt datetimeoffset,
                                               @FortedSport varchar(1000),
                                               @FortedLeague varchar(1000),
                                               @FilterName varchar(1000),
-                                              @FortedSurebetId int
+                                              @FortedSurebetId bigint
 as
 begin
     set nocount on
-    declare @Id int
+    declare @Id bigint
 
     select @Id = FortedSurebetId from dbo.FortedSurebet where FortedSurebetId = @FortedSurebetId
     if @@rowcount = 0

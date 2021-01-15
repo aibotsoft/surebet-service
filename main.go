@@ -10,6 +10,7 @@ import (
 	"github.com/aibotsoft/surebet-service/pkg/store"
 	"github.com/aibotsoft/surebet-service/services/collector"
 	"github.com/aibotsoft/surebet-service/services/handler"
+	"github.com/aibotsoft/surebet-service/services/receiver"
 	"github.com/aibotsoft/surebet-service/services/server"
 	"os"
 	"os/signal"
@@ -36,7 +37,8 @@ func main() {
 
 	c := collector.New(cfg, log, sto, cli)
 	go c.CollectJob()
-
+	r := receiver.New(cfg, log, h)
+	r.Subscribe()
 	go func() { errc <- s.Serve() }()
 	defer func() { s.Close() }()
 	log.Info("exit: ", <-errc)

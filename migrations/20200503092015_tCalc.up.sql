@@ -9,8 +9,9 @@ create table dbo.Calc
     SecondIndex     tinyint,
     WinDiff         decimal(9, 5),
     WinDiffRel      decimal(9, 5),
-    FortedSurebetId int                                        not null,
+    FortedSurebetId bigint                                     not null,
     SurebetId       bigint                                     not null,
+    Roi           int,
 
     CreatedAt       datetimeoffset default sysdatetimeoffset() not null,
     constraint PK_Calc primary key (SurebetId),

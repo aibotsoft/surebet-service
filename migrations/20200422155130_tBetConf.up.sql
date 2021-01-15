@@ -13,11 +13,17 @@ create table dbo.BetConfig
     MaxAmountEvent int           not null default 100,
     MaxAmountLine  int           not null default 100,
     RoundValue     decimal(9, 5) not null default 1,
+    MinRoi         int           not null default 100,
+    SubName        varchar(50)   not null default '',
+
     constraint PK_BetConfig primary key (ServiceName),
     constraint CK_BetConfig_Regime check (Regime IN ('Disabled', 'Surebet', 'OnlyCheck')),
 )
 insert into dbo.BetConfig (ServiceName, Regime, MinStake, MaxStake, MinPercent, MaxPercent, Priority, MaxCountLine,
-                           MaxCountEvent, MaxAmountEvent,MaxAmountLine, RoundValue)
-values ('Pinnacle', 'Surebet', default, default, default, default, default, default, default, default,default, 0.01),
-       ('Sbobet', 'Surebet', default, default, default, default, default, default, default, default,default, default),
-       ('Dafabet', 'Surebet', default, default, default, default, default, default, default, default,default, default)
+                           MaxCountEvent, MaxAmountEvent, MaxAmountLine, RoundValue, MinRoi)
+values ('Pinnacle', 'Surebet', default, default, default, default, default, default, default, default, default, 0.01,
+        default),
+       ('Sbobet', 'Surebet', default, default, default, default, default, default, default, default, default, default,
+        default),
+       ('Dafabet', 'Surebet', default, default, default, default, default, default, default, default, default, default,
+        default)

@@ -7,8 +7,9 @@ create or alter proc dbo.uspSaveCalc @Profit decimal(9, 5),
                                      @SecondIndex tinyint,
                                      @WinDiff decimal(9, 5),
                                      @WinDiffRel decimal(9, 5),
-                                     @FortedSurebetId int,
-                                     @SurebetId bigint
+                                     @FortedSurebetId bigint,
+                                     @SurebetId bigint,
+                                     @Roi int
 as
 begin
     set nocount on
@@ -17,10 +18,10 @@ begin
     select @Id = SurebetId from dbo.Calc where SurebetId = @SurebetId
     if @@rowcount = 0
         insert into dbo.Calc(Profit, FirstName, SecondName, LowerWinIndex, HigherWinIndex, FirstIndex, SecondIndex,
-                             WinDiff, WinDiffRel, FortedSurebetId, SurebetId)
+                             WinDiff, WinDiffRel, FortedSurebetId, SurebetId, Roi)
         output inserted.SurebetId
         values (@Profit, @FirstName, @SecondName, @LowerWinIndex, @HigherWinIndex, @FirstIndex, @SecondIndex, @WinDiff,
-                @WinDiffRel, @FortedSurebetId, @SurebetId)
+                @WinDiffRel, @FortedSurebetId, @SurebetId, @Roi)
     else
         select @Id
 end

@@ -13,30 +13,47 @@ import (
 
 type Clients map[string]pb.FortedClient
 
+var CloneMap = map[string]string{
+	"Betdaq":       "SportMarket",
+	"Matchbook":    "SportMarket",
+	"Betfair":      "SportMarket",
+	"SbobetMarket": "SportMarket",
+	"Black":        "SportMarket",
+}
+var SportMarketClones = []string{"Betdaq", "Matchbook", "Betfair", "SbobetMarket", "SportMarket", "Black"}
+
 func NewClients(cfg *config.Config, log *zap.SugaredLogger, conf *config_client.ConfClient) Clients {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.GrpcTimeout)
-	defer cancel()
 	services, err := conf.GetServices(ctx)
+	cancel()
 	if err != nil {
 		log.Panic(err)
 	}
 	clients := make(Clients)
 	for _, s := range services {
 		addr := net.JoinHostPort("", strconv.FormatInt(s.GrpcPort, 10))
+		log.Info("begin_dial_service: ", s.GrpcPort, " err: ", err, " addr: ", addr)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.GrpcTimeout)
 		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock())
+		cancel()
 		if err != nil {
-			log.Errorw("dial to client error", "name", s.ServiceName, "addr", addr)
+			log.Infow("dial_to_client_error", "name", s.ServiceName, "addr", addr, " err", err)
 			continue
 		}
 		c := pb.NewFortedClient(conn)
 		log.Infow("begin ping to server", "name", s.ServiceName, "addr", addr)
+		ctx, cancel = context.WithTimeout(context.Background(), cfg.Service.GrpcTimeout)
 		_, err = c.Ping(ctx, &pb.PingRequest{})
+		cancel()
 		if err != nil {
 			log.Errorw("server do not response to ping", "name", s.ServiceName, "addr", addr)
 			continue
 		}
 		log.Infow("server responded", "name", s.ServiceName, "addr", addr)
 		clients[s.FortedName] = c
+	}
+	for cloneName, serviceName := range CloneMap {
+		clients[cloneName] = clients[serviceName]
 	}
 	return clients
 }

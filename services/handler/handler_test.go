@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	pb "github.com/aibotsoft/gen/fortedpb"
 	"github.com/aibotsoft/micro/config"
 	"github.com/aibotsoft/micro/config_client"
@@ -10,8 +9,6 @@ import (
 	"github.com/aibotsoft/micro/util"
 	"github.com/aibotsoft/surebet-service/pkg/clients"
 	"github.com/aibotsoft/surebet-service/pkg/store"
-	"github.com/aibotsoft/surebet-service/pkg/tests"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
@@ -68,11 +65,6 @@ func TestHandler_SurebetLoop(t *testing.T) {
 	h.SurebetLoop(sur)
 }
 
-func TestHandler_CheckLine(t *testing.T) {
-	sur := tests.SurebetHelper(t)
-	h.CheckLine(context.Background(), sur, 0, nil)
-}
-
 func TestSurebetWithOneMember(t *testing.T) {
 	sur := SurebetToProcess(t)
 	got := SurebetWithOneMember(sur, 1)
@@ -84,12 +76,4 @@ func TestTimeFromSurebetId(t *testing.T) {
 	time.Sleep(time.Millisecond * 10)
 	got := ElapsedFromSurebetId(sbId)
 	t.Log(got)
-}
-
-func TestHandler_GetCurrency(t *testing.T) {
-	got, err := h.GetCurrency(context.Background())
-	if assert.NoError(t, err) {
-		assert.NotEmpty(t, got)
-		t.Log(got)
-	}
 }
