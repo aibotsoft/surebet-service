@@ -6,9 +6,9 @@ import (
 	"github.com/aibotsoft/micro/config_client"
 	"github.com/aibotsoft/micro/logger"
 	"github.com/aibotsoft/micro/sqlserver"
-	"github.com/aibotsoft/micro/util"
 	"github.com/aibotsoft/surebet-service/pkg/clients"
 	"github.com/aibotsoft/surebet-service/pkg/store"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
@@ -20,8 +20,9 @@ func TestMain(m *testing.M) {
 	log := logger.New()
 	db := sqlserver.MustConnectX(cfg)
 	sto := store.NewStore(cfg, log, db)
-	cli := clients.NewClients(nil, log, nil)
 	conf := config_client.New(cfg, log)
+
+	cli := clients.NewClients(cfg, log, conf)
 	h = NewHandler(cfg, log, sto, cli, conf)
 	m.Run()
 	h.Close()
@@ -38,7 +39,7 @@ func SurebetToProcess(t *testing.T) *pb.Surebet {
 		FortedProfit: 6.66,
 		Members: []*pb.SurebetSide{{
 			Num:         1,
-			ServiceName: "Sbobet",
+			ServiceName: "Dafabet",
 			SportName:   "E Sports",
 			LeagueName:  "FIFA 20 - Russia Liga Pro (12 Mins)",
 			Home:        "EZ1D 11 (EZ1)",
@@ -60,20 +61,12 @@ func SurebetToProcess(t *testing.T) *pb.Surebet {
 		}}}
 }
 
-func TestHandler_SurebetLoop(t *testing.T) {
+func TestHandler_ProcessSurebet(t *testing.T) {
 	sur := SurebetToProcess(t)
-	h.SurebetLoop(sur)
-}
+	t.Log(sur)
+	err := h.ProcessSurebet(sur)
+	if assert.NoError(t, err) {
 
-func TestSurebetWithOneMember(t *testing.T) {
-	sur := SurebetToProcess(t)
-	got := SurebetWithOneMember(sur, 1)
-	t.Log(got)
-}
-
-func TestTimeFromSurebetId(t *testing.T) {
-	sbId := util.UnixUsNow()
-	time.Sleep(time.Millisecond * 10)
-	got := ElapsedFromSurebetId(sbId)
-	t.Log(got)
+	}
+	t.Log(h.upclient)
 }

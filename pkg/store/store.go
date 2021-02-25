@@ -11,19 +11,27 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"time"
 )
 
 type Store struct {
-	cfg   *config.Config
-	log   *zap.SugaredLogger
-	db    *sqlx.DB
-	Cache *ristretto.Cache
+	cfg    *config.Config
+	log    *zap.SugaredLogger
+	db     *sqlx.DB
+	Cache  *ristretto.Cache
+	tracer trace.Tracer
 }
 
 func NewStore(cfg *config.Config, log *zap.SugaredLogger, db *sqlx.DB) *Store {
-	return &Store{log: log, db: db, Cache: cache.NewCache(cfg)}
+	return &Store{
+		log:    log,
+		db:     db,
+		Cache:  cache.NewCache(cfg),
+		tracer: otel.Tracer("store"),
+	}
 }
 func (s *Store) Close() {
 	err := s.db.Close()
@@ -33,44 +41,10 @@ func (s *Store) Close() {
 	s.Cache.Close()
 }
 
-//func MemberByName(sb *pb.Surebet, serviceName string) *pb.SurebetSide {
-//	for i := 0; i < len(sb.Members); i++ {
-//		if sb.Members[i].ServiceName == serviceName {
-//			return sb.Members[i]
-//		}
-//	}
-//	return nil
-//}
-//func MemberNameList(sb *pb.Surebet) []string {
-//	var nameList []string
-//	for i := 0; i < len(sb.Members); i++ {
-//		nameList = append(nameList, sb.Members[i].ServiceName)
-//	}
-//	return nameList
-//}
-//
-//func Filter(arr []pb.BetConfig, name string) *pb.BetConfig {
-//	for i := range arr {
-//		if arr[i].ServiceName == name {
-//			return &arr[i]
-//		}
-//	}
-//	return nil
-//}
-
-//func (s *Store) LoadConfig(ctx context.Context, sb *pb.Surebet) error {
-//	var betConfigs []pb.BetConfig
-//	query, args, err := sqlx.In("SELECT * FROM dbo.BetConfig WHERE ServiceName IN (?)", MemberNameList(sb))
-//	err = s.db.SelectContext(ctx, &betConfigs, s.db.Rebind(query), args...)
-//	if err != nil {
-//		return errors.Wrapf(err, "select BetConfig error")
-//	}
-//	for i := range sb.Members {
-//		sb.Members[i].BetConfig = Filter(betConfigs, sb.Members[i].ServiceName)
-//	}
-//	return nil
-//}
 func (s *Store) GetConfigByName(ctx context.Context, name string) (conf pb.BetConfig, err error) {
+	ctx, span := s.tracer.Start(ctx, "GetConfigByName:"+name)
+	defer span.End()
+
 	got, b := s.Cache.Get("config:" + name)
 	if b {
 		return got.(pb.BetConfig), nil
@@ -284,3 +258,41 @@ func (s *Store) SaveBetList(results []pb.BetResult) error {
 	}
 	return nil
 }
+
+//func MemberByName(sb *pb.Surebet, serviceName string) *pb.SurebetSide {
+//	for i := 0; i < len(sb.Members); i++ {
+//		if sb.Members[i].ServiceName == serviceName {
+//			return sb.Members[i]
+//		}
+//	}
+//	return nil
+//}
+//func MemberNameList(sb *pb.Surebet) []string {
+//	var nameList []string
+//	for i := 0; i < len(sb.Members); i++ {
+//		nameList = append(nameList, sb.Members[i].ServiceName)
+//	}
+//	return nameList
+//}
+//
+//func Filter(arr []pb.BetConfig, name string) *pb.BetConfig {
+//	for i := range arr {
+//		if arr[i].ServiceName == name {
+//			return &arr[i]
+//		}
+//	}
+//	return nil
+//}
+
+//func (s *Store) LoadConfig(ctx context.Context, sb *pb.Surebet) error {
+//	var betConfigs []pb.BetConfig
+//	query, args, err := sqlx.In("SELECT * FROM dbo.BetConfig WHERE ServiceName IN (?)", MemberNameList(sb))
+//	err = s.db.SelectContext(ctx, &betConfigs, s.db.Rebind(query), args...)
+//	if err != nil {
+//		return errors.Wrapf(err, "select BetConfig error")
+//	}
+//	for i := range sb.Members {
+//		sb.Members[i].BetConfig = Filter(betConfigs, sb.Members[i].ServiceName)
+//	}
+//	return nil
+//}

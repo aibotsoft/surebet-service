@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	pb "github.com/aibotsoft/gen/fortedpb"
 	"github.com/aibotsoft/micro/status"
@@ -119,7 +120,10 @@ func (h *Handler) CalcSecond(sb *pb.Surebet) (isDone bool) {
 	return false
 }
 
-func (h *Handler) Calc(sb *pb.Surebet) *SurebetError {
+func (h *Handler) Calc(ctx context.Context, sb *pb.Surebet) *SurebetError {
+	ctx, span := h.tracer.Start(ctx, "Calc")
+	defer span.End()
+
 	sb.Calc.Profit = Profit(sb)
 	fStarts, err2 := h.ConvertStartTime(sb.Starts)
 	if err2 != nil {

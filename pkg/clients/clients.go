@@ -5,6 +5,7 @@ import (
 	pb "github.com/aibotsoft/gen/fortedpb"
 	"github.com/aibotsoft/micro/config"
 	"github.com/aibotsoft/micro/config_client"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
@@ -41,7 +42,12 @@ func NewClients(cfg *config.Config, log *zap.SugaredLogger, conf *config_client.
 		}
 		log.Info("begin_dial_service: ", addr, " err: ", err)
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Service.GrpcTimeout)
-		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithBlock())
+		conn, err := grpc.DialContext(ctx,
+			addr,
+			grpc.WithInsecure(),
+			grpc.WithBlock(),
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		)
 		cancel()
 		if err != nil {
 			log.Infow("dial_to_client_error", "name", s.ServiceName, "addr", addr, " err", err)

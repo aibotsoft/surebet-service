@@ -53,7 +53,10 @@ func AllCheckStatusOk(sb *fortedpb.Surebet) *SurebetError {
 	}
 	return nil
 }
-func AllCheckStatus(sb *fortedpb.Surebet) *SurebetError {
+func (h *Handler) AllCheckStatus(ctx context.Context, sb *fortedpb.Surebet) *SurebetError {
+	ctx, span := h.tracer.Start(ctx, "AllCheckStatus")
+	defer span.End()
+
 	var err *SurebetError
 	for i := 0; i < len(sb.Members); i++ {
 		switch sb.Members[i].Check.Status {
@@ -153,6 +156,9 @@ func SurebetWithOneMember(sb *fortedpb.Surebet, i int64) *fortedpb.Surebet {
 	return &copySb
 }
 func (h *Handler) LoadConfig(ctx context.Context, sb *fortedpb.Surebet) *SurebetError {
+	ctx, span := h.tracer.Start(ctx, "LoadConfig")
+	defer span.End()
+
 	for i := range sb.Members {
 		conf, err := h.store.GetConfigByName(ctx, sb.Members[i].ServiceName)
 		if err != nil {
@@ -162,15 +168,10 @@ func (h *Handler) LoadConfig(ctx context.Context, sb *fortedpb.Surebet) *Surebet
 	}
 	return nil
 }
-func (h *Handler) LoadConfigForSub(ctx context.Context, sb *fortedpb.Surebet) {
-	for i := range sb.Members {
-		conf, err := h.store.GetConfigBySub(ctx, sb.Members[i].Check.SubService)
-		if err == nil {
-			sb.Members[i].BetConfig = &conf
-		}
-	}
-}
 func (h *Handler) GetCurrency(ctx context.Context, sb *fortedpb.Surebet) *SurebetError {
+	ctx, span := h.tracer.Start(ctx, "GetCurrency")
+	defer span.End()
+
 	get, b := h.store.Cache.Get("currency_list")
 	if b {
 		sb.Currency = get.([]fortedpb.Currency)
@@ -186,6 +187,14 @@ func (h *Handler) GetCurrency(ctx context.Context, sb *fortedpb.Surebet) *Surebe
 	}
 	h.store.Cache.SetWithTTL("currency_list", sb.Currency, 1, time.Hour)
 	return nil
+}
+func (h *Handler) LoadConfigForSub(ctx context.Context, sb *fortedpb.Surebet) {
+	for i := range sb.Members {
+		conf, err := h.store.GetConfigBySub(ctx, sb.Members[i].Check.SubService)
+		if err == nil {
+			sb.Members[i].BetConfig = &conf
+		}
+	}
 }
 
 func (h *Handler) HasAnyBet(sb *fortedpb.Surebet) bool {

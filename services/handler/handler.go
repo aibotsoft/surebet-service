@@ -13,6 +13,9 @@ import (
 	"github.com/aibotsoft/surebet-service/pkg/loop_count"
 	"github.com/aibotsoft/surebet-service/pkg/store"
 	"github.com/aibotsoft/surebet-service/pkg/time_id"
+	"github.com/uptrace/uptrace-go/uptrace"
+	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	gstatus "google.golang.org/grpc/status"
@@ -29,22 +32,37 @@ const (
 )
 
 type Handler struct {
-	cfg     *config.Config
-	log     *zap.SugaredLogger
-	store   *store.Store
-	clients clients.Clients
-	tel     *telegram.Telegram
-	Conf    *config_client.ConfClient
+	cfg      *config.Config
+	log      *zap.SugaredLogger
+	store    *store.Store
+	clients  clients.Clients
+	tel      *telegram.Telegram
+	Conf     *config_client.ConfClient
+	upclient *uptrace.Client
+	tracer   trace.Tracer
 }
 
 func NewHandler(cfg *config.Config, log *zap.SugaredLogger, store *store.Store, clients clients.Clients, conf *config_client.ConfClient) *Handler {
 	tel := telegram.New(cfg, log)
-	return &Handler{cfg: cfg, log: log, store: store, clients: clients, tel: tel, Conf: conf}
+	upclient := uptrace.NewClient(&uptrace.Config{ServiceName: "surebet"})
+	tracer := upclient.Tracer("handler")
+
+	return &Handler{
+		cfg:      cfg,
+		log:      log,
+		store:    store,
+		clients:  clients,
+		tel:      tel,
+		Conf:     conf,
+		upclient: upclient,
+		tracer:   tracer,
+	}
 }
 
 func (h *Handler) Close() {
 	h.store.Close()
 	h.Conf.Close()
+	h.upclient.Close()
 }
 
 func (h *Handler) CheckLine(ctx context.Context, sb *pb.Surebet, i int64, wg *sync.WaitGroup) {
@@ -52,6 +70,10 @@ func (h *Handler) CheckLine(ctx context.Context, sb *pb.Surebet, i int64, wg *sy
 		defer wg.Done()
 	}
 	side := sb.Members[i]
+	ctx, span := h.tracer.Start(ctx, "CheckLine:"+side.ServiceName)
+	defer span.End()
+
+	span.SetAttributes(label.String("surebet.service_name", side.ServiceName))
 	side.Check = &pb.Check{Status: status.StatusError, Id: util.UnixMsNow()}
 	response, err := h.clients[side.ServiceName].CheckLine(ctx, &pb.CheckLineRequest{Surebet: SurebetWithOneMember(sb, i)})
 	if err != nil {
@@ -113,6 +135,9 @@ func (h *Handler) PlaceBet(ctx context.Context, sb *pb.Surebet, i int64, wg *syn
 }
 
 func (h *Handler) SendCheckLines(ctx context.Context, sb *pb.Surebet) {
+	ctx, span := h.tracer.Start(ctx, "SendCheckLines")
+	defer span.End()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go h.CheckLine(ctx, sb, 0, &wg)
@@ -208,7 +233,10 @@ func (h *Handler) SurebetLoop(sb *pb.Surebet) {
 	//}
 }
 
-func (h *Handler) ReleaseChecks(sb *pb.Surebet) {
+func (h *Handler) ReleaseChecks(ctx context.Context, sb *pb.Surebet) {
+	ctx, span := h.tracer.Start(ctx, "ReleaseChecks")
+	defer span.End()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go h.ReleaseCheck(sb, 0, &wg)
@@ -229,31 +257,39 @@ var timeIdProducer = time_id.NewTimeId(1)
 
 func (h *Handler) ProcessSurebet(sb *pb.Surebet) *SurebetError {
 	ctx := context.Background()
+
+	ctx, span := h.tracer.Start(ctx, "ProcessSurebet")
+	defer span.End()
+
 	sb.SurebetId = timeIdProducer.GetId()
+	span.SetAttributes(label.Int64("surebet.id", sb.SurebetId), label.Int64("surebet.forted_id", sb.FortedSurebetId))
+
 	start := util.UnixMsNow()
 	if err := h.AllServicesActive(sb); err != nil {
+		span.RecordError(err)
 		return err
 	}
 	if err := h.LoadConfig(ctx, sb); err != nil {
+		span.RecordError(err)
 		return err
 	}
 
-	//if err := h.AnyDisabled(sb); err != nil {
-	//	return err
-	//}
 	if err := h.GetCurrency(ctx, sb); err != nil {
+		span.RecordError(err)
 		return err
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, checkTimeOut)
 	h.SendCheckLines(checkCtx, sb)
 	cancel()
-	defer h.ReleaseChecks(sb)
+	defer h.ReleaseChecks(ctx, sb)
 
-	if err := AllCheckStatus(sb); err != nil {
+	if err := h.AllCheckStatus(ctx, sb); err != nil {
+		span.RecordError(err)
 		return err
 	}
 	//h.LoadConfigForSub(ctx, sb)
-	if err := h.Calc(sb); err != nil {
+	if err := h.Calc(ctx, sb); err != nil {
+		span.RecordError(err)
 		return err
 	}
 	if err := h.AllSurebet(sb); err != nil {
