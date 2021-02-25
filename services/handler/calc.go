@@ -121,9 +121,6 @@ func (h *Handler) CalcSecond(sb *pb.Surebet) (isDone bool) {
 }
 
 func (h *Handler) Calc(ctx context.Context, sb *pb.Surebet) *SurebetError {
-	ctx, span := h.tracer.Start(ctx, "Calc")
-	defer span.End()
-
 	sb.Calc.Profit = Profit(sb)
 	fStarts, err2 := h.ConvertStartTime(sb.Starts)
 	if err2 != nil {

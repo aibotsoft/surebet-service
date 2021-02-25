@@ -54,9 +54,6 @@ func AllCheckStatusOk(sb *fortedpb.Surebet) *SurebetError {
 	return nil
 }
 func (h *Handler) AllCheckStatus(ctx context.Context, sb *fortedpb.Surebet) *SurebetError {
-	ctx, span := h.tracer.Start(ctx, "AllCheckStatus")
-	defer span.End()
-
 	var err *SurebetError
 	for i := 0; i < len(sb.Members); i++ {
 		switch sb.Members[i].Check.Status {
@@ -156,9 +153,6 @@ func SurebetWithOneMember(sb *fortedpb.Surebet, i int64) *fortedpb.Surebet {
 	return &copySb
 }
 func (h *Handler) LoadConfig(ctx context.Context, sb *fortedpb.Surebet) *SurebetError {
-	ctx, span := h.tracer.Start(ctx, "LoadConfig")
-	defer span.End()
-
 	for i := range sb.Members {
 		conf, err := h.store.GetConfigByName(ctx, sb.Members[i].ServiceName)
 		if err != nil {
@@ -169,9 +163,6 @@ func (h *Handler) LoadConfig(ctx context.Context, sb *fortedpb.Surebet) *Surebet
 	return nil
 }
 func (h *Handler) GetCurrency(ctx context.Context, sb *fortedpb.Surebet) *SurebetError {
-	ctx, span := h.tracer.Start(ctx, "GetCurrency")
-	defer span.End()
-
 	get, b := h.store.Cache.Get("currency_list")
 	if b {
 		sb.Currency = get.([]fortedpb.Currency)

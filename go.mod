@@ -12,15 +12,12 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/jinzhu/copier v0.2.3
 	github.com/jmoiron/sqlx v1.3.1
-	github.com/klauspost/compress v1.11.7 // indirect
 	github.com/nats-io/jwt v1.2.2 // indirect
 	github.com/nats-io/nats-server/v2 v2.1.7 // indirect
 	github.com/nats-io/nats.go v1.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.2.0
 	github.com/stretchr/testify v1.6.1
-	github.com/uptrace/uptrace-go v0.7.5
-	github.com/vmihailenco/msgpack/v5 v5.2.0 // indirect
 	github.com/vrischmann/envconfig v1.3.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.16.0
 	go.opentelemetry.io/otel v0.16.0
